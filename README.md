@@ -1,69 +1,55 @@
-# Pot-App 生词本插件模板仓库 (以 [Anki](https://apps.ankiweb.net) 为例)
+# Pot-App 墨墨云词本添加单词插件
 
-### 此仓库为模板仓库，编写插件时可以直接由此仓库创建插件仓库
+## 使用方法
 
-## 插件编写指南
+1. 下载对应平台的插件，得到 `.potext` 文件
+2. 打开 Pot-偏好设置-服务设置-翻译-添加外部插件-安装外部插件
+3. 选择刚刚得到的 `.potext` 文件，安装成功
+4. 将插件添加到服务列表即可使用
 
-### 1. 插件仓库创建
+## 获取墨墨 Token
 
-- 以此仓库为模板创建一个新的仓库
-- 仓库名为 `pot-app-collection-plugin-<插件名>`，例如 `pot-app-collection-plugin-anki`
+1. **打开墨墨背单词 APP**。
 
-### 2. 插件信息配置
+2. **申请开放 API 的 Token**
 
-编辑 `info.json` 文件，修改以下字段：
+   - 进入 **我的** > **更多设置** > **实验功能** > **开放 API**。
+   - 按照提示申请您的 API Token。
 
-- `id`：插件唯一 id，必须以`plugin`开头，例如 `plugin.com.pot-app.anki`
-- `homepage`: 插件主页，填写你的仓库地址即可，例如 `https://github.com/pot-app/pot-app-collection-plugin-template`
-- `display`: 插件显示名称，例如 `Anki`
-- `icon`: 插件图标，例如 `anki.svg`
-- `needs`: 插件依赖，一个数组，每个依赖为一个对象，包含以下字段：
-  - `key`: 依赖 key，对应该项依赖在配置文件中的名称，例如 `port`
-  - `display`: 依赖显示名称，对应用户显示的名称，例如 `端口号`
-  - `type`: 组件类型 `input` | `select`
-  - `options`: 选项列表(仅 select 组件需要)，例如 `{"engine_a":"Engina A","engine_b":"Engina B"}`
+3. **记录 Token**
 
-### 3. 插件编写/编译
+   - 申请成功后，会显示您的 **Token**，请妥善保存。
 
-编辑 `main.js` 实现 `collection` 函数
+## 云词本 ID 获取方法
 
-#### 输入参数
-```javascript
-// config: config map
-// detect: detected source language
-// setResult: function to set result text
-// utils: some tools
-//     http: tauri http module
-//     readBinaryFile: function
-//     readTextFile: function
-//     Database: tauri Database class
-//     CryptoJS: CryptoJS module
-//     cacheDir: cache dir path
-//     pluginDir: current plugin dir 
-//     osType: "Windows_NT" | "Darwin" | "Linux"
-async function collection(source, target, options = {}) {
-  const { config, utils } = options;
-  const { http, readBinaryFile, readTextFile, Database, CryptoJS, run, cacheDir, pluginDir, osType } = utils;
-  const { fetch, Body } = http;
-}
-```
+1. **创建云词本**
 
-#### 返回值
+   - 在墨墨背单词 APP 中，创建一个新的云词本，或使用已有的云词本。
 
-```javascript
-return true;
-```
+2. **访问墨墨开放 API 文档**
 
-### 4. 打包 pot 插件
+   - 打开浏览器，访问[墨墨开放 API 文档](https://open.maimemo.com/document#/operations/maimemo.openapi.notepad.v1.NotepadService.ListNotepads)
+   
+3. **填写请求参数**
 
-1. 将`main.js`文件和`info.json`以及图标文件压缩为 zip 文件。
+   - **Token**
+     - 在页面右侧的 **Token** 输入框中输入墨墨 Token, 注意在 Token 前加上 `Bearer `：
+       ```
+       Bearer your_momo_token_here
+       ```
+   - **limit***：
+     - 填写您创建的所有云词本数量，确保能获取到所有的云词本。
+   - **offset***：
+     - 填写 `0`。
 
-2. 将文件重命名为`<插件id>.potext`，例如`plugin.com.pot-app.anki.potext`,即可得到 pot 需要的插件。
+4. **发送请求**
 
-## 自动编译打包
+   - 点击 **发送** 按钮，获取您的云词本列表。
 
-本仓库配置了 Github Actions，可以实现推送后自动编译打包插件。
+5. **获取云词本 ID**
 
-每次将仓库推送到 GitHub 之后 actions 会自动运行，将打包好的插件上传到 artifact，在 actions 页面可以下载
-
-每次提交 Tag 之后，actions 会自动运行，将打包好的插件上传到 release，在 release 页面可以下载打包好的插件
+   - 在返回的结果中，找到您想要使用的云词本。
+   - `title`为词本名。
+   - 复制该云词本的 `id`
+  
+   ![示意图](./get_ID.png)
