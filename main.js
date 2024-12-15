@@ -1,102 +1,90 @@
 async function collection(source, target, options = {}) {
     const { config, utils } = options;
-    const { http } = utils;
-    const { fetch, Boxy } = http;
+    const { tauriFetch: fetch } = utils;
+    const { momo_token: momoToken, notepad_id: notepadId } = config;
 
-    const { port = 8765 } = config;
-
-    async function ankiConnect(action, version, params = {}) {
-        let res = await fetch(`http://127.0.0.1:${port}`, {
-            method: 'POST',
-            body: Body.json({ action, version, params }),
-        });
-        return res.data;
+    if (!momoToken || momoToken.length === 0) {
+        throw "Momo token not found";
+    }
+    if (!notepadId || notepadId.length === 0) {
+        throw "Notepad ID not found";
     }
 
-    function ankiText(target) {
-        let result = '';
-        if (typeof target === 'object') {
-            for (let explanation of target.explanations) {
-                result += explanation.trait + '. ';
-                let index = 0;
-                for (let explain of explanation.explains) {
-                    index++;
-                    if (index !== explanation.explains.length) {
-                        result += explain + '; ';
-                    } else {
-                        result += explain + '<br>';
-                    }
-                }
+    // 获取当前云词本的内容
+    let getRes = await fetch(
+        `https://open.maimemo.com/open/api/v1/notepads/${encodeURIComponent(notepadId)}`,
+        {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${momoToken}`,
+                "Accept": "application/json",
+            },
+        },
+    );
+
+    if (getRes.ok) {
+        const result = getRes.data;
+
+        if (!result.success) {
+            throw `Error fetching notepad: ${JSON.stringify(result.errors)}`;
+        }
+
+        const notepad = result.data.notepad;
+        if (!notepad) {
+            throw "Notepad not found";
+        }
+
+        let currentContent = notepad.content || "";
+        let wordsArray = currentContent ? currentContent.split("\n") : [];
+
+        // 避免重复添加
+        if (!wordsArray.includes(source)) {
+            wordsArray.push(source);
+        } else {
+            return true;
+        }
+
+        let newContent = wordsArray.join("\n");
+
+        let body = {
+            notepad: {
+                status: notepad.status || "UNPUBLISHED",
+                title: notepad.title || "pot",
+                brief: notepad.brief || "add from pot",
+                tags: notepad.tags || ["其他"],
+                content: newContent,
+            },
+        };
+
+        // 发送更新云词本请求
+        let postRes = await fetch(
+            `https://open.maimemo.com/open/api/v1/notepads/${encodeURIComponent(notepadId)}`,
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${momoToken}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                body: {
+                    type: "Json",
+                    payload: body,
+                },
+            },
+        );
+
+        if (postRes.ok) {
+            const postResult = postRes.data;
+
+            if (postResult.success && postResult.data.notepad) {
+                return true;
+            } else {
+                throw `Error updating notepad: ${JSON.stringify(postResult.errors)}`;
             }
         } else {
-            return target;
+            throw `Http Request Error\nHttp Status: ${postRes.status}\n${JSON.stringify(postRes.data)}`;
         }
-
-        return result;
+    } else {
+        throw `Http Request Error\nHttp Status: ${getRes.status}\n${JSON.stringify(getRes.data)}`;
     }
-
-    function ankiPronunciation(target) {
-        let results = [];
-        if (typeof target !== 'object' || target.pronunciations === undefined) {
-            return results;
-        }
-        for (let i = 0; i < target.pronunciations.length; i++) {
-            let pronunciation = target.pronunciations[i];
-
-            let region = pronunciation.region;
-            let symbol = pronunciation.symbol;
-
-            // make pronunciation symbol readable
-            region = region ? `[${region}]` : '';
-            symbol = symbol[0] === '/' ? symbol : `/${symbol}/`;
-            let regionSymbol = `${region} ${symbol}`;
-
-            let audio;
-            if (pronunciation.voice) {
-                // step1: convert number array to Char String
-                // step2: convert Char String to base64
-                let voiceString = String.fromCharCode(...pronunciation.voice);
-                let voice = btoa(voiceString);
-
-                let filename = `${region}_${source}.mp3`;
-                let fields = [`Voice${i + 1}`];
-
-                audio = { data: voice, filename, fields };
-            }
-            results.push({ regionSymbol, audio });
-        }
-        return results;
-    }
-
-    await ankiConnect('createDeck', 6, { deck: 'Pot' });
-
-    await ankiConnect('createModel', 6, {
-        modelName: 'Pot Card 2',
-        inOrderFields: ['Front', 'Back', 'Symbol1', 'Voice1', 'Symbol2', 'Voice2'],
-        isCloze: false,
-        cardTemplates: [
-            {
-                Name: 'Pot Card 2',
-                Front: '{{Front}}',
-                Back: '{{FrontSide}}<br>{{Symbol1}} {{Voice1}}<br>{{Symbol2}} {{Voice2}}<hr id=answer>{{Back}}',
-            },
-        ],
-    });
-
-    let pronunciations = ankiPronunciation(target);
-    await ankiConnect('addNote', 6, {
-        note: {
-            deckName: 'Pot',
-            modelName: 'Pot Card 2',
-            fields: {
-                Front: source,
-                Back: ankiText(target),
-                Symbol1: pronunciations[0] && pronunciations[0].regionSymbol,
-                Symbol2: pronunciations[1] && pronunciations[1].regionSymbol,
-            },
-            audio: pronunciations.map((pronunciation) => {
-                return pronunciation.audio;
-            }),
-        },
-    });
 }
